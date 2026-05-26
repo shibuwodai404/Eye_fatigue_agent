@@ -1,0 +1,29 @@
+# Visual Fatigue Agent —— pip / conda 依赖清单
+# pyproject.toml 是真相源；这里同步用于 conda 环境的 pip install -r
+
+langgraph>=0.2.50
+langchain-core>=0.3.0
+langchain-ollama>=0.2.0
+llama-index>=0.11.0
+llama-index-embeddings-huggingface>=0.3.0
+sentence-transformers>=3.0.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+httpx>=0.27.0
+pydantic>=2.8.0
+pydantic-settings>=2.5.0
+psycopg[binary]>=3.2.0
+pgvector>=0.3.0
+loguru>=0.7.2
+numpy>=1.26.0
+pandas>=2.2.0
+scikit-learn>=1.5.0
+python-multipart>=0.0.9
+typer>=0.12.0
+rich>=13.7.0
+jinja2>=3.1.0
+
+# dev
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+ruff>=0.6.0

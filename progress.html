@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>视疲劳诊断 Agent —— 进度与计划</title>
+<style>
+  :root {
+    --fg: #1f2328;
+    --muted: #57606a;
+    --accent: #0969da;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+    --err: #cf222e;
+    --border: #d0d7de;
+    --bg-soft: #f6f8fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+                 "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.7;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 40px 32px 96px;
+    background: #fff;
+  }
+  header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 32px;
+  }
+  header h1 { margin: 0 0 8px; font-size: 26px; }
+  header .meta { color: var(--muted); font-size: 13px; }
+  h2 { font-size: 21px; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 36px; }
+  h3 { font-size: 16px; margin-top: 20px; }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; background: var(--bg-soft); padding: 2px 6px; border-radius: 4px; font-size: 0.88em; }
+  pre { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
+  pre code { background: transparent; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--bg-soft); }
+  ul, ol { padding-left: 24px; } li { margin: 4px 0; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .pill-ok { background: #dafbe1; color: var(--ok); border: 1px solid #aceebb; }
+  .pill-warn { background: #fff8c5; color: var(--warn); border: 1px solid #eac54f; }
+  .pill-err { background: #ffebe9; color: var(--err); border: 1px solid #ffabaa; }
+  .pill-pending { background: #ddf4ff; color: var(--accent); border: 1px solid #b6e3ff; }
+  .callout { border-left: 4px solid var(--warn); background: #fff8e1; padding: 10px 16px; border-radius: 4px; margin: 14px 0; }
+  .callout.err { border-left-color: var(--err); background: #ffebe9; }
+  .callout.ok { border-left-color: var(--ok); background: #dafbe1; }
+  .callout.info { border-left-color: var(--accent); background: #ddf4ff; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+  .nowrap { white-space: nowrap; }
+  .num { font-variant-numeric: tabular-nums; }
+  .tiny { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>视疲劳诊断 Agent —— 进度与计划</h1>
+  <div class="meta">
+    项目路径: <code>/home/brain/projects/eye-agent/</code> · brain 机 (10.6.155.59)
+    <br>更新: 2026-05-11 · 阶段: 框架骨架已通过 smoke test（视觉为 mock，待接 Detectron2）
+  </div>
+</header>
+
+<h2 id="status">一、整体状态</h2>
+
+<div class="callout ok">
+<strong>当前节点：</strong>框架代码 + Ollama LLM 通路 + 报告生成 已端到端跑通。<strong>视觉</strong>用 mock 指标占位（Detectron2 待接入）。<strong>RAG / 病例相似检索</strong>在 demo 进程内有死锁 bug，已用消融开关绕过。
+</div>
+
+<table>
+<tr><th>模块</th><th>状态</th><th>说明</th></tr>
+<tr><td>LangGraph 8 节点编排</td><td><span class="pill pill-ok">PASS</span></td><td><code>intake → vision → aggregator → retrieval → diagnosis → consistency → case_library → report</code></td></tr>
+<tr><td>Ollama LLM (qwen3.5:35b-a3b)</td><td><span class="pill pill-ok">PASS</span></td><td>6 次调用全成功（intake×1 + diagnosis×3 + report×2）</td></tr>
+<tr><td>Self-consistency 投票</td><td><span class="pill pill-ok">PASS</span></td><td>3 个 temperature 全部判 moderate → confidence 1.0</td></tr>
+<tr><td>Feature Aggregator</td><td><span class="pill pill-ok">PASS</span></td><td>composite_score=1.684，自动识别 6 项指标异常</td></tr>
+<tr><td>双报告生成（医生版 + 患者版）</td><td><span class="pill pill-ok">PASS</span></td><td>医生版含量化表 + 鉴别诊断 + 处置；患者版通俗可操作</td></tr>
+<tr><td>LLM Trace 落盘</td><td><span class="pill pill-ok">PASS</span></td><td><code>logs/llm_traces/{patient_id}_{session_id}.jsonl</code></td></tr>
+<tr><td>视觉服务（Detectron2 接入）</td><td><span class="pill pill-warn">MOCK</span></td><td>FastAPI 骨架已写，<code>_run_detectron2_inference()</code> 返回随机但合理的占位指标；TODO 留好等真实代码贴入</td></tr>
+<tr><td>RAG 指南检索（LlamaIndex + BGE-M3）</td><td><span class="pill pill-err">DEADLOCK</span></td><td>BGE-M3 单跑正常（4 秒加载 + 0.46s embed），但在 demo 进程内死锁；已用 <code>DISABLE_RAG=true</code> 绕过</td></tr>
+<tr><td>相似病例检索（pgvector / JSONL）</td><td><span class="pill pill-err">DEADLOCK</span></td><td>同 RAG，依赖 BGE-M3；<code>DISABLE_SIMILAR_CASES=true</code></td></tr>
+<tr><td>病例库写入（JSONL fallback）</td><td><span class="pill pill-warn">UNTESTED</span></td><td>代码路径完成，但因 case_library 依赖 embedding 也被关闭过；逻辑未实际触发</td></tr>
+<tr><td>PostgreSQL + pgvector</td><td><span class="pill pill-pending">TODO</span></td><td>schema (<code>scripts/init_db.sql</code>) 已写；PG 未安装；JSONL fallback 在用</td></tr>
+<tr><td>消融实验脚手架</td><td><span class="pill pill-ok">READY</span></td><td><code>evaluation/ablation.py</code> 用 subprocess 隔离，可独立切换每个 disable_* 跑数据集</td></tr>
+<tr><td>评估指标</td><td><span class="pill pill-ok">READY</span></td><td><code>evaluation/metrics.py</code> 含 accuracy / F1 / Cohen's κ</td></tr>
+</table>
+
+<h2 id="last-run">二、最近一次成功跑的结果</h2>
+
+<table>
+<tr><th>项</th><th>值</th></tr>
+<tr><td>Patient ID</td><td><code>demo_001</code>（mock：29 岁男性程序员，每日屏幕 10h，主诉干涩刺痛）</td></tr>
+<tr><td>消融配置</td><td><code>disable_rag=True, disable_similar_cases=True, disable_case_library=True, disable_consistency=False</code></td></tr>
+<tr><td>诊断标签</td><td>视频终端综合征伴干眼倾向</td></tr>
+<tr><td>严重度</td><td>moderate（vote: 3/3）</td></tr>
+<tr><td>置信度</td><td>1.0</td></tr>
+<tr><td>requires_human_review</td><td>False</td></tr>
+<tr><td>LLM 调用次数</td><td>6（含 1 intake + 3 diagnosis + 2 report）</td></tr>
+<tr><td>总耗时</td><td>≈ 4 分 4 秒（冷启动后），多数花在 35B 模型推理</td></tr>
+<tr><td>报告文件</td><td><code>logs/reports/demo_001_ab7abf72-…(.doctor.md|.patient.md|.state.json)</code></td></tr>
+</table>
+
+<h3>各 LLM 调用耗时</h3>
+<table>
+<tr><th>Agent</th><th>Temperature</th><th class="num">耗时</th></tr>
+<tr><td>intake</td><td>0.1</td><td class="num">93.8 s</td></tr>
+<tr><td>diagnosis</td><td>0.3</td><td class="num">106.2 s</td></tr>
+<tr><td>diagnosis</td><td>0.5</td><td class="num">71.1 s</td></tr>
+<tr><td>diagnosis</td><td>0.7</td><td class="num">≈ 60 s</td></tr>
+<tr><td>report.doctor</td><td>0.3</td><td class="num">≈ 25 s</td></tr>
+<tr><td>report.patient</td><td>0.3</td><td class="num">≈ 25 s</td></tr>
+</table>
+
+<h2 id="bug">三、已知 Bug：RAG / 相似检索死锁</h2>
+
+<div class="callout err">
+<strong>现象：</strong>demo 进程跑到 retrieval 节点 → 调 <code>rag_retriever.retrieve_guideline()</code> 或 <code>embed_text()</code> 后整个进程挂在 <code>futex_wait_queue_me</code>，CPU 几乎不动，GPU 0 %，11+ 分钟无 LLM 调用产生。强制 kill 才能恢复。
+</div>
+
+<h3>已排除的可能</h3>
+<ul>
+  <li>✗ BGE-M3 模型自身：<strong>单独进程 4 秒加载 + 0.46s embed，正常</strong>。</li>
+  <li>✗ HuggingFace 网络：<code>HF_HUB_OFFLINE=1</code> 后仍死锁。</li>
+  <li>✗ 全局 SOCKS 代理：<code>NO_PROXY=localhost,127.0.0.1</code> 已设，且 BGE-M3 单跑能成功。</li>
+  <li>✗ Ollama 异常：intake LLM 调用已成功完成，证明 ollama 路径正常。</li>
+</ul>
+
+<h3>可能的根因（待验证）</h3>
+<ol>
+  <li><strong>LlamaIndex × torch fork 死锁</strong>：demo 进程已经 import 了 langgraph / langchain-ollama / httpx，可能给 BG worker 留下了某种锁状态，第二次（在 retrieval 节点）调 sentence-transformers/torch 时与 tokenizers 的 fork 守卫冲突。</li>
+  <li><strong>LIDSettings.llm = None</strong> 触发 llama-index 内部 MockLLM 初始化时与 BGE-M3 的 CUDA 上下文初始化竞态。</li>
+  <li><strong>多线程 lazy lock</strong>：<code>rag_retriever._get_embed_model</code> 的 <code>threading.Lock</code> 与上游 LangGraph 的某个 thread/asyncio 状态死锁。</li>
+</ol>
+
+<h3>排查计划（按优先级）</h3>
+<ol>
+  <li>在 <code>graph.compile</code> 之前预热 BGE-M3（强制在主进程早期完成 CUDA 初始化），观察是否解锁。</li>
+  <li>把 <code>rag_retriever.retrieve_guideline</code> 临时替换为只用 sentence-transformers 直调 + 简易余弦检索，绕开 LlamaIndex 框架，看 BGE-M3 在 demo 进程里能否完成 embed。</li>
+  <li>用 <code>py-spy dump --pid X</code> 抓死锁栈帧，定位卡在 torch / llama-index 的具体调用。</li>
+  <li>若仍无解，把 RAG 拆到独立子进程（类似 <code>scripts/run_single_case.py</code> 的隔离思路），通过 IPC / FastAPI 让 demo 进程只发 HTTP 调用，避免在主进程同时跑两个 PyTorch 子系统。</li>
+</ol>
+
+<h2 id="next">四、下一步计划（按优先级）</h2>
+
+<table>
+<tr><th>#</th><th>事项</th><th>预计工作量</th><th>依赖</th></tr>
+<tr>
+  <td>1</td>
+  <td>修 RAG / 相似检索死锁（按上一节计划执行）</td>
+  <td>0.5–1 天</td>
+  <td>—</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>接入 Detectron2 推理：把现有眼部分割 + 行为指标代码贴进 <code>src/services/vision_api.py</code> 的 <code>_run_detectron2_inference()</code>；启动 FastAPI 服务后跑真实视频</td>
+  <td>视代码现状</td>
+  <td>用户提供 Detectron2 代码 + 测试视频</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>安装 PostgreSQL + pgvector，把 <code>CASE_DB_BACKEND</code> 切到 <code>POSTGRES</code>；JSONL 病例迁移到 PG</td>
+  <td>0.5 天</td>
+  <td>sudo 权限</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>替换占位指南文档为正式临床指南（CVS / DED / 调节功能障碍），重建 RAG 索引</td>
+  <td>0.5 天</td>
+  <td>有合规来源的临床指南 PDF/MD</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>用 5–10 例真实标注病例跑一遍消融实验（full / no_rag / no_consistency / no_case_lib），出第一版 accuracy + Cohen's κ</td>
+  <td>1 天</td>
+  <td>有标注的病例数据</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td>论文撰写：方法学透明度章节（agent 流程图 + 每节点功能 + 消融结果）</td>
+  <td>2–3 天</td>
+  <td>消融结果就绪</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td>Prompt 优化：现版 prompt 在 mock 数据下质量已不错；接入真数据后做一次 prompt 工程迭代</td>
+  <td>0.5–1 天</td>
+  <td>真实病例数据</td>
+</tr>
+</table>
+
+<h2 id="env">五、环境与运行</h2>
+
+<h3>运行环境</h3>
+<table>
+<tr><th>项</th><th>状态</th></tr>
+<tr><td>Python 环境</td><td>conda env <code>eye-agent</code>（Python 3.11）</td></tr>
+<tr><td>关键包</td><td>langgraph 1.1.10 · langchain-ollama 1.1.0 · llama-index 0.14.21 · sentence-transformers 5.4.1 · torch 2.11 (CUDA cu13) · pgvector 0.4.2</td></tr>
+<tr><td>LLM</td><td>Ollama 守护进程已起；<code>qwen3.5:35b-a3b</code> (23GB) 已加载；<code>qwen3-vl:8b</code> 备选</td></tr>
+<tr><td>GPU</td><td>2× RTX 5060 Ti 16GB；推理时双卡 ≈ 13GB 各占用，35%/32% 利用率</td></tr>
+<tr><td>代理</td><td>全局 SOCKS5 <code>127.0.0.1:1080</code>；本地服务调用必须设 <code>NO_PROXY=localhost,127.0.0.1</code></td></tr>
+</table>
+
+<h3>从零跑通的命令</h3>
+<pre><code>conda activate eye-agent
+cd /home/brain/projects/eye-agent
+
+export NO_PROXY=localhost,127.0.0.1
+export no_proxy=localhost,127.0.0.1
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+export TOKENIZERS_PARALLELISM=false
+
+# 当前能稳定跑通的配置（绕开 RAG bug）
+export DISABLE_RAG=true
+export DISABLE_SIMILAR_CASES=true
+export DISABLE_CASE_LIBRARY=true
+
+python -m scripts.demo_end_to_end --patient-id demo_001 --skip-warmup</code></pre>
+
+<h3>关键路径</h3>
+<table>
+<tr><th>用途</th><th>路径</th></tr>
+<tr><td>项目根</td><td><code>/home/brain/projects/eye-agent/</code></td></tr>
+<tr><td>需求文档</td><td><code>REQUIREMENTS.html</code></td></tr>
+<tr><td>本进度文档</td><td><code>progress.html</code></td></tr>
+<tr><td>LLM trace</td><td><code>logs/llm_traces/{patient_id}_{session_id}.jsonl</code></td></tr>
+<tr><td>生成的报告</td><td><code>logs/reports/</code>（含 <code>.doctor.md / .patient.md / .state.json</code>）</td></tr>
+<tr><td>病例库（JSONL fallback）</td><td><code>logs/case_library.jsonl</code></td></tr>
+<tr><td>RAG 索引</td><td><code>logs/rag_index/</code></td></tr>
+<tr><td>消融结果输出</td><td><code>logs/ablation/</code></td></tr>
+</table>
+
+<h2 id="files">六、源码索引</h2>
+
+<table>
+<tr><th>路径</th><th>作用</th></tr>
+<tr><td><code>src/state.py</code></td><td>GraphState TypedDict 定义</td></tr>
+<tr><td><code>src/config.py</code></td><td>pydantic-settings 配置 + 消融开关</td></tr>
+<tr><td><code>src/llm.py</code></td><td>Ollama 调用 + JSONL trace 落盘</td></tr>
+<tr><td><code>src/graph.py</code></td><td>LangGraph 8 节点编排</td></tr>
+<tr><td><code>src/main.py</code></td><td>Typer CLI 入口</td></tr>
+<tr><td><code>src/agents/{intake,vision,feature_aggregator,retrieval,diagnosis,consistency,case_library,report}.py</code></td><td>各 agent，统一 <code>run(state) -&gt; state</code> 接口</td></tr>
+<tr><td><code>src/tools/{vision_service_client,case_db,rag_retriever}.py</code></td><td>视觉服务 HTTP 客户端 / 病例库 / RAG 检索</td></tr>
+<tr><td><code>src/services/vision_api.py</code></td><td>FastAPI 视觉服务骨架（含 Detectron2 TODO）</td></tr>
+<tr><td><code>src/prompts/*.md</code></td><td>4 个系统 prompt（中文医学语境）</td></tr>
+<tr><td><code>scripts/demo_end_to_end.py</code></td><td>端到端 demo 入口</td></tr>
+<tr><td><code>scripts/ingest_knowledge.py</code></td><td>RAG 知识库灌入</td></tr>
+<tr><td><code>scripts/run_single_case.py</code></td><td>单 case subprocess 驱动（供消融实验调用）</td></tr>
+<tr><td><code>scripts/init_db.sql</code></td><td>PG + pgvector 病例库 schema</td></tr>
+<tr><td><code>evaluation/{metrics,ablation}.py</code></td><td>评估指标 + 消融实验脚手架</td></tr>
+<tr><td><code>tests/{test_state,test_each_agent}.py</code></td><td>单元 / 集成测试（依赖外部的标 skip）</td></tr>
+</table>
+
+<hr>
+<p class="tiny">本文档随项目同步更新；如有变更请直接编辑 <code>progress.html</code> 后提交。</p>
+
+</body>
+</html>

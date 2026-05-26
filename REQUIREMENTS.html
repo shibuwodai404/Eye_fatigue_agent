@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>视疲劳诊断 Agent 框架搭建 — 需求文档</title>
+<style>
+  :root {
+    --fg: #1f2328;
+    --muted: #57606a;
+    --accent: #0969da;
+    --border: #d0d7de;
+    --bg-soft: #f6f8fa;
+    --bg-code: #f6f8fa;
+    --warn: #9a6700;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+                 "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.7;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+    background: #fff;
+  }
+  header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 32px;
+  }
+  header h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+  }
+  header .meta {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  h2 {
+    font-size: 22px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-top: 40px;
+  }
+  h3 {
+    font-size: 17px;
+    margin-top: 24px;
+    color: var(--fg);
+  }
+  h4 {
+    font-size: 15px;
+    margin: 18px 0 8px;
+    color: var(--muted);
+  }
+  ul, ol { padding-left: 24px; }
+  li { margin: 4px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    background: var(--bg-code);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code { background: transparent; padding: 0; }
+  strong { color: #24292f; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th { background: var(--bg-soft); }
+  blockquote {
+    border-left: 4px solid var(--accent);
+    margin: 16px 0;
+    padding: 4px 16px;
+    color: var(--muted);
+    background: var(--bg-soft);
+    border-radius: 0 4px 4px 0;
+  }
+  .callout {
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--warn);
+    background: #fff8e1;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 16px 0;
+  }
+  .tag {
+    display: inline-block;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1px 10px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-right: 6px;
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  .toc {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 24px;
+    margin-bottom: 32px;
+  }
+  .toc ol { margin: 4px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>项目：视疲劳诊断 Agent 框架搭建</h1>
+  <div class="meta">
+    <span class="tag">投稿目标 · iScience</span>
+    <span class="tag">LangGraph + Ollama</span>
+    <span class="tag">本地部署 · 数据不出域</span>
+    <br>
+    创建日期：2026-05-11 · 项目路径：<code>/home/brain/projects/eye-agent/</code>
+  </div>
+</header>
+
+<div class="toc">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#bg">背景与目标</a></li>
+    <li><a href="#stack">技术栈（已决定，不要替换）</a></li>
+    <li><a href="#arch">系统架构</a></li>
+    <li><a href="#layout">目录结构要求</a></li>
+    <li><a href="#constraints">关键设计约束</a></li>
+    <li><a href="#scope">本次任务的交付范围</a></li>
+    <li><a href="#confirm">开始之前请先确认</a></li>
+  </ol>
+</div>
+
+<h2 id="bg">一、背景与目标</h2>
+
+<p>我已经有以下资产，需要你帮我搭建一个 agent 框架来整合它们，最终目标是发表在 <strong>iScience</strong> 期刊。</p>
+
+<h3>已有资产</h3>
+<ol>
+  <li>
+    <strong>视觉模型</strong>：基于 Detectron2 训练的眼部分割模型，已封装为 Python 推理代码
+    <ul>
+      <li>输入：外置设备录制的眼部视频（mp4）</li>
+      <li>输出：行为指标（眨眼频率、眨眼完整度、眼动幅度、注视稳定性等）</li>
+      <li>现有输出形式：Excel 表格 + HTML+视频可视化报告</li>
+    </ul>
+  </li>
+  <li>
+    <strong>本地 LLM</strong>：主机上已部署 Ollama（请在代码中假设
+    <code>http://localhost:11434</code>，模型名通过环境变量
+    <code>OLLAMA_MODEL</code> 配置，默认 <code>qwen2.5:14b</code>）
+  </li>
+  <li>
+    <strong>运行环境</strong>：本地主机（GPU 可用），无云端依赖，数据不出域
+  </li>
+</ol>
+
+<h3>项目目标（iScience 投稿导向）</h3>
+<p>构建一个<strong>多 Agent 协作的视疲劳诊断系统</strong>，核心创新点：</p>
+<ul>
+  <li>将训练好的视觉模型作为 tool 暴露给 LLM agent</li>
+  <li>Agent 综合行为指标 + 患者主诉 + RAG 知识库 + 历史相似病例 → 给出可解释的诊断推理</li>
+  <li>病例库随使用增长，反哺新病例的诊断（"系统越用越聪明"）</li>
+  <li>所有诊断推理可追溯、可消融实验，满足 iScience 对方法学透明度的要求</li>
+</ul>
+
+<h2 id="stack">二、技术栈（已决定，不要替换）</h2>
+<ul>
+  <li>Agent 编排：<strong>LangGraph</strong>（状态机式，符合诊断流程）</li>
+  <li>LLM 后端：<strong>Ollama</strong>（通过 <code>langchain-ollama</code> 接入）</li>
+  <li>视觉模型：作为 <strong>FastAPI REST 服务</strong>独立运行，agent 通过 HTTP 调用</li>
+  <li>病例库：<strong>PostgreSQL + pgvector</strong>（结构化字段 + 向量字段）</li>
+  <li>嵌入模型：<strong>BGE-M3</strong>（中文医学文本检索效果好，通过 sentence-transformers 本地运行）</li>
+  <li>知识库 RAG：<strong>LlamaIndex</strong></li>
+  <li>配置管理：<strong>pydantic-settings</strong>，所有参数走 <code>.env</code></li>
+  <li>日志：<strong>loguru</strong>，所有 agent 决策必须可追溯</li>
+</ul>
+
+<h2 id="arch">三、系统架构</h2>
+<p>请实现以下 LangGraph 状态图：</p>
+<pre><code>[START]
+  → IntakeAgent       (采集患者基本信息、主诉、量表分数 CVS-Q/OSDI)
+  → VisionAgent       (调用 FastAPI 视觉服务，获取行为指标)
+  → FeatureAggregator (时序统计 + 异常值检测 + 指标归一化)
+  → RetrievalAgent    (RAG 检索: 指南文献 + 相似历史病例)
+  → DiagnosisAgent    (Chain-of-thought 推理，输出诊断 + 严重度分级)
+  → ConsistencyCheck  (Self-consistency: 独立推理 3 次取一致结果)
+  → CaseLibraryAgent  (结构化入库 PostgreSQL)
+  → ReportAgent       (生成医生版 + 患者版双报告)
+[END]</code></pre>
+
+<blockquote>每个节点的 State 必须包含上游所有节点的输出，便于失败时回溯和消融实验。</blockquote>
+
+<h2 id="layout">四、目录结构要求</h2>
+<pre><code>visual_fatigue_agent/
+├── pyproject.toml              # 用 uv 管理依赖
+├── .env.example
+├── README.md
+├── src/
+│   ├── config.py               # pydantic-settings 配置
+│   ├── state.py                # LangGraph State 定义（TypedDict）
+│   ├── agents/
+│   │   ├── intake.py
+│   │   ├── vision.py
+│   │   ├── feature_aggregator.py
+│   │   ├── retrieval.py
+│   │   ├── diagnosis.py
+│   │   ├── consistency.py
+│   │   ├── case_library.py
+│   │   └── report.py
+│   ├── tools/
+│   │   ├── vision_service_client.py    # 调用 FastAPI 视觉服务
+│   │   ├── case_db.py                  # PostgreSQL + pgvector CRUD
+│   │   └── rag_retriever.py            # LlamaIndex 知识库
+│   ├── services/
+│   │   └── vision_api.py               # FastAPI 包装 Detectron2 推理
+│   ├── prompts/                        # 所有 prompt 模板独立成文件
+│   │   ├── diagnosis_system.md
+│   │   ├── intake_system.md
+│   │   └── ...
+│   ├── graph.py                        # LangGraph 主图编排
+│   └── main.py                         # CLI 入口
+├── tests/
+│   ├── test_state.py
+│   ├── test_each_agent.py              # 每个 agent 可独立测试（消融实验需要）
+│   └── fixtures/
+├── scripts/
+│   ├── init_db.sql                     # PostgreSQL schema
+│   └── ingest_knowledge.py             # 灌入指南文献到 RAG 库
+└── evaluation/
+    ├── metrics.py                      # 准确率、F1、Cohen's κ
+    └── ablation.py                     # 消融实验脚手架</code></pre>
+
+<h2 id="constraints">五、关键设计约束</h2>
+
+<ol>
+  <li>
+    <strong>每个 agent 必须可独立调用和单独评估</strong> —— 这是消融实验的硬性要求。
+    每个 agent 都暴露 <code>run(state) -&gt; state</code> 接口，
+    不要内部 hard-code 调用其他 agent。
+  </li>
+  <li>
+    <strong>所有 LLM 调用必须记录</strong>：input prompt、output、token 数、耗时、模型版本。
+    存到 <code>logs/</code> 下的 JSONL，每个患者一个文件，
+    文件名 <code>{patient_id}_{timestamp}.jsonl</code>。
+  </li>
+  <li>
+    <strong>视觉模型集成方式</strong>：先实现 <code>services/vision_api.py</code> 的 FastAPI 框架
+    （端点 <code>/analyze</code>，接收视频路径，返回行为指标 JSON），
+    <strong>留出 TODO 让我把现有的 Detectron2 推理代码贴进去</strong>，
+    不要尝试生成 Detectron2 推理代码。
+  </li>
+  <li>
+    <strong>病例库 schema</strong> 至少包含：patient_id、采集时间、主诉文本、
+    量表分数（结构化字段）、行为指标（JSONB）、诊断结论、严重度分级、
+    agent 推理链（text）、医生复核结果（可空，用于后续监督）、
+    视频文件路径、症状文本的 embedding 向量（用于相似病例检索）。
+  </li>
+  <li>
+    <strong>Self-consistency 实现</strong>：DiagnosisAgent 用不同 temperature
+    （0.3 / 0.5 / 0.7）跑 3 次，ConsistencyCheck 节点用多数投票 + 置信度分析；
+    如果三次结果分歧大（如严重度跨两级），State 标记
+    <code>requires_human_review=True</code>。
+  </li>
+  <li>
+    <strong>配置驱动消融</strong>：在 config 里加 <code>ablation_mode</code> 字段，
+    可以一键关闭某个 agent（如 <code>disable_rag=True</code>、
+    <code>disable_consistency=True</code>），便于实验。
+  </li>
+  <li>
+    <strong>不要过度工程化</strong>：第一版不需要 web UI、不需要 Docker、不需要异步并发。
+    CLI 跑通端到端流程即可。
+  </li>
+</ol>
+
+<h2 id="scope">六、本次任务的交付范围</h2>
+
+<p>请<strong>只生成框架代码 + 占位实现</strong>，具体业务逻辑留 TODO 注释，重点保证：</p>
+<ol>
+  <li>完整的目录结构和 <code>pyproject.toml</code>（用 uv，Python 3.11+）</li>
+  <li>LangGraph 状态图能跑通（每个 agent 用 mock 数据返回合理结构）</li>
+  <li>PostgreSQL schema SQL 文件</li>
+  <li>FastAPI 视觉服务的骨架（不含 Detectron2 代码）</li>
+  <li>每个 agent 的 prompt 模板文件（中文医学场景）</li>
+  <li>一个端到端的 demo 脚本：输入一个 mock 视频路径，跑完整个流程，输出报告</li>
+</ol>
+
+<div class="callout">
+  <strong>不要做的事</strong>
+  <ul>
+    <li>不要写 Detectron2 推理代码（我有现成的）</li>
+    <li>不要写前端 UI</li>
+    <li>不要试图自动获取临床指南文献（先用占位文档）</li>
+    <li>不要写 Dockerfile 和部署脚本</li>
+  </ul>
+</div>
+
+<h2 id="confirm">七、开始之前请先确认</h2>
+
+<p>在生成代码前，请先<strong>输出你的实施计划</strong>：</p>
+<ol>
+  <li>你打算分几步实现（按文件 / 模块）</li>
+  <li>每个 agent 的 prompt 设计思路（一两句话即可）</li>
+  <li>State TypedDict 的关键字段</li>
+  <li>是否对上述需求有任何不清楚或不合理的地方</li>
+</ol>
+
+<blockquote>
+  我确认计划后你再开始写代码。如果中途发现需要追加技术决策（如选用某个具体库），
+  先停下来问我。
+</blockquote>
+
+<hr>
+<p style="color: var(--muted); font-size: 13px; text-align: center;">
+  本文档为项目初始需求快照，后续若需求变更请同步更新此文件。
+</p>
+
+</body>
+</html>

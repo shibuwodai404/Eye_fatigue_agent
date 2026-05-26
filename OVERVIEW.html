@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Eye-agent · 项目梳理（Motivation / 核心功能 / 框架思路）</title>
+<style>
+  :root {
+    --fg: #1f2328;
+    --muted: #57606a;
+    --accent: #0969da;
+    --accent-soft: #ddf4ff;
+    --border: #d0d7de;
+    --bg-soft: #f6f8fa;
+    --bg-code: #f6f8fa;
+    --warn: #9a6700;
+    --green: #1a7f37;
+    --red: #cf222e;
+    --purple: #8250df;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+                 "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    line-height: 1.7;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+    background: #fff;
+  }
+  header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 32px;
+  }
+  header h1 { margin: 0 0 8px; font-size: 28px; }
+  header .meta { color: var(--muted); font-size: 14px; }
+  h2 {
+    font-size: 22px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-top: 44px;
+  }
+  h3 { font-size: 17px; margin-top: 28px; }
+  h4 { font-size: 14px; margin: 16px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 4px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    background: var(--bg-code);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code { background: transparent; padding: 0; }
+  strong { color: #24292f; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--bg-soft); }
+  blockquote {
+    border-left: 4px solid var(--accent);
+    margin: 16px 0;
+    padding: 4px 16px;
+    color: var(--muted);
+    background: var(--bg-soft);
+    border-radius: 0 4px 4px 0;
+  }
+  .callout {
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--warn);
+    background: #fff8e1;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 16px 0;
+  }
+  .tag {
+    display: inline-block;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1px 10px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-right: 6px;
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .toc { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 14px 22px; margin-bottom: 32px; }
+  .toc ol { margin: 4px 0; }
+
+  /* Pipeline 节点图 */
+  .pipeline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0 8px;
+  }
+  .node {
+    flex: 1 1 calc(25% - 10px);
+    min-width: 180px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  .node .num { color: var(--accent); font-weight: 700; font-size: 11px; letter-spacing: .08em; }
+  .node .name { font-weight: 600; margin: 2px 0 4px; }
+  .node .desc { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+  .node.io { border-top-color: var(--green); }
+  .node.io .num { color: var(--green); }
+  .node.llm { border-top-color: var(--purple); }
+  .node.llm .num { color: var(--purple); }
+  .node.tool { border-top-color: #d4a72c; }
+  .node.tool .num { color: #d4a72c; }
+
+  /* 三栏价值卡片 */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 16px 0; }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    background: #fff;
+  }
+  .card h4 { margin-top: 0; color: var(--accent); }
+  .card p { margin: 0; font-size: 14px; color: var(--fg); }
+
+  .legend { display: inline-flex; gap: 14px; font-size: 12px; color: var(--muted); margin: -4px 0 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Eye-agent · 项目梳理</h1>
+  <div class="meta">
+    <span class="tag">视疲劳诊断</span>
+    <span class="tag">多 Agent · LangGraph</span>
+    <span class="tag">本地 Ollama · 数据不出域</span>
+    <span class="tag">iScience 投稿</span>
+    <br>
+    项目目录：<code>/Users/leogy/LGYai/Research/Eye-agent</code> ·
+    远端同源：<code>brain:/home/brain/projects/eye-agent</code>
+  </div>
+</header>
+
+<div class="toc">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#motivation">一、Motivation：为什么做这件事</a></li>
+    <li><a href="#features">二、核心功能：系统能做什么</a></li>
+    <li><a href="#framework">三、框架思路：怎么搭起来的</a></li>
+    <li><a href="#state">四、State Schema 与数据流</a></li>
+    <li><a href="#design">五、关键设计取舍</a></li>
+    <li><a href="#layout">六、代码组织</a></li>
+    <li><a href="#quickstart">七、快速跑通</a></li>
+  </ol>
+</div>
+
+<h2 id="motivation">一、Motivation：为什么做这件事</h2>
+
+<h3>资产 × 痛点 × 目标</h3>
+
+<table>
+<thead>
+<tr><th style="width:28%">已有资产</th><th style="width:36%">单独看的问题</th><th>组合起来的机会</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>眼部行为视觉模型</strong><br><span class="tag">Detectron2 分割</span><br>输入眼部视频，输出眨眼频率 / 完整度、眼动幅度、注视稳定性等</td>
+  <td>只产出 <em>Excel + HTML 可视化</em>，<strong>不下结论</strong>，临床场景仍要医生看图说话</td>
+  <td rowspan="3">
+    把视觉模型作为 <strong>tool</strong> 暴露给 LLM agent，agent 综合
+    <strong>行为指标 + 主诉 + 量表（CVS-Q/OSDI）+ 指南 RAG + 历史相似病例</strong>
+    给出可解释的诊断，并把每次诊断回写入病例库——
+    <strong>系统越用越聪明</strong>，且全过程在本地，数据不出域。
+  </td>
+</tr>
+<tr>
+  <td><strong>本地 LLM</strong><br><span class="tag">Ollama</span><br>主机上已部署，GPU 可用</td>
+  <td>裸模型不懂临床流程、不会调外部工具、推理结果一次性不可追溯</td>
+</tr>
+<tr>
+  <td><strong>本地运行环境</strong><br><span class="tag">GPU + 私有数据</span></td>
+  <td>医疗数据有合规约束，<strong>不能走云端</strong>；但本地缺现成多 agent 编排框架</td>
+</tr>
+</tbody>
+</table>
+
+<h3>iScience 投稿的方法学卖点</h3>
+<div class="cards">
+  <div class="card">
+    <h4>① Tool-augmented Diagnosis</h4>
+    <p>视觉模型作为可调用的 FastAPI 服务，LLM 通过结构化指标推理，避免"端到端黑盒"。</p>
+  </div>
+  <div class="card">
+    <h4>② Self-improving Case Library</h4>
+    <p>每例诊断结构化入库（PG + pgvector），后续病例自动检索相似先例反哺推理。</p>
+  </div>
+  <div class="card">
+    <h4>③ Transparent &amp; Ablatable</h4>
+    <p>每个 agent 独立可关、每次 LLM 调用全量 trace，方法学透明度直接服务消融实验。</p>
+  </div>
+</div>
+
+<h2 id="features">二、核心功能：系统能做什么</h2>
+
+<h3>一次问诊的端到端输入 / 输出</h3>
+
+<table>
+<thead><tr><th style="width:30%">输入</th><th style="width:35%">系统处理</th><th>输出</th></tr></thead>
+<tbody>
+<tr>
+  <td>
+    • 患者眼部视频 (mp4)<br>
+    • 主诉自由文本<br>
+    • CVS-Q / OSDI 量表总分<br>
+    • 人口学信息 (年龄 / 性别 / 屏幕时长)
+  </td>
+  <td>
+    8 节点 LangGraph 顺序流水线（详见第三节），其中
+    <strong>诊断节点用 3 个 temperature 并行采样</strong>，
+    <strong>一致性节点</strong>做多数投票 + 置信度评估
+  </td>
+  <td>
+    • 诊断标签 + 严重度（none/mild/moderate/severe）<br>
+    • 置信度 + 投票分布<br>
+    • <strong>医生版报告</strong>（含推理链与证据引用）<br>
+    • <strong>患者版报告</strong>（通俗语言）<br>
+    • 是否触发 <code>requires_human_review</code><br>
+    • 完整 state JSON + LLM trace JSONL
+  </td>
+</tr>
+</tbody>
+</table>
+
+<h3>关键运行能力</h3>
+<ul>
+  <li><strong>可消融</strong> — 通过 <code>.env</code> 一键关闭：<code>DISABLE_RAG</code> / <code>DISABLE_CONSISTENCY</code> / <code>DISABLE_CASE_LIBRARY</code> / <code>DISABLE_SIMILAR_CASES</code>。</li>
+  <li><strong>可追溯</strong> — 每次 LLM 调用记录到 <code>logs/llm_traces/{patient_id}_{session_id}.jsonl</code>，包含 prompt / output / tokens / latency / temperature。</li>
+  <li><strong>降级 friendly</strong> — 病例库默认 JSONL fallback；装好 PG + pgvector 后改 <code>CASE_DB_BACKEND=POSTGRES</code> 无缝切换。</li>
+  <li><strong>视觉模型解耦</strong> — Detectron2 推理代码留 <code>TODO</code> 占位，作为独立 FastAPI 服务运行（默认端口 <code>8765</code>），agent 通过 HTTP 调用。</li>
+</ul>
+
+<h2 id="framework">三、框架思路：怎么搭起来的</h2>
+
+<h3>编排层：8 节点 LangGraph 流水线</h3>
+
+<div class="legend">
+  <span><span class="swatch" style="background:#1a7f37"></span>IO / 入库</span>
+  <span><span class="swatch" style="background:#d4a72c"></span>工具调用</span>
+  <span><span class="swatch" style="background:#8250df"></span>LLM 推理</span>
+  <span><span class="swatch" style="background:#0969da"></span>聚合 / 决策</span>
+</div>
+
+<div class="pipeline">
+  <div class="node io">
+    <div class="num">① IO</div>
+    <div class="name">IntakeAgent</div>
+    <div class="desc">主诉文本 + 量表分 → LLM 抽取结构化字段（症状、风险因素等）</div>
+  </div>
+  <div class="node tool">
+    <div class="num">② TOOL</div>
+    <div class="name">VisionAgent</div>
+    <div class="desc">HTTP 调用 FastAPI 视觉服务，拉取眨眼 / 眼动等行为指标</div>
+  </div>
+  <div class="node">
+    <div class="num">③ AGG</div>
+    <div class="name">FeatureAggregator</div>
+    <div class="desc">归一化 (z-score) + 异常检测 + 综合疲劳分</div>
+  </div>
+  <div class="node tool">
+    <div class="num">④ TOOL</div>
+    <div class="name">RetrievalAgent</div>
+    <div class="desc">RAG：LlamaIndex + BGE-M3 检索指南文献 + pgvector 找相似历史病例</div>
+  </div>
+  <div class="node llm">
+    <div class="num">⑤ LLM ×3</div>
+    <div class="name">DiagnosisAgent</div>
+    <div class="desc">CoT 推理，3 个 temperature (0.3/0.5/0.7) 并行采样 3 份候选诊断</div>
+  </div>
+  <div class="node">
+    <div class="num">⑥ DECIDE</div>
+    <div class="name">ConsistencyCheck</div>
+    <div class="desc">多数投票 + 置信度；分歧跨级 → <code>requires_human_review=True</code></div>
+  </div>
+  <div class="node io">
+    <div class="num">⑦ IO</div>
+    <div class="name">CaseLibraryAgent</div>
+    <div class="desc">结构化字段 + 文本 embedding 入库 PG（或 JSONL 兜底）</div>
+  </div>
+  <div class="node llm">
+    <div class="num">⑧ LLM</div>
+    <div class="name">ReportAgent</div>
+    <div class="desc">医生版 (含推理 / 证据) + 患者版 (通俗语言) Markdown 报告</div>
+  </div>
+</div>
+
+<blockquote>
+  图本身 <strong>不做条件分支</strong> —— "禁用某节点" 已在 agent 内部用 <code>settings.ablation.*</code> 短路成 no-op。
+  这样消融实验只改 <code>.env</code>，图拓扑零变更。
+</blockquote>
+
+<h3>分层职责</h3>
+<table>
+<thead><tr><th style="width:14%">分层</th><th style="width:20%">目录</th><th>职责</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>编排</strong></td>
+  <td><code>src/graph.py</code><br><code>src/state.py</code></td>
+  <td>定义 GraphState TypedDict（累加式），把 8 个 agent 编排成顺序图</td>
+</tr>
+<tr>
+  <td><strong>Agent</strong></td>
+  <td><code>src/agents/*.py</code></td>
+  <td>每个 agent 暴露 <code>run(state) -&gt; state</code>，可独立调用 / 单测 / 关停</td>
+</tr>
+<tr>
+  <td><strong>Tools</strong></td>
+  <td><code>src/tools/</code></td>
+  <td>视觉服务 HTTP 客户端、PG/JSONL 病例库、LlamaIndex RAG 检索器</td>
+</tr>
+<tr>
+  <td><strong>Services</strong></td>
+  <td><code>src/services/vision_api.py</code></td>
+  <td>FastAPI 包装 Detectron2 推理（独立进程，端口 8765；推理代码留 TODO）</td>
+</tr>
+<tr>
+  <td><strong>LLM 接入</strong></td>
+  <td><code>src/llm.py</code></td>
+  <td>统一封装 Ollama <code>/api/chat</code>；强制 JSON 模式；每次调用写入 state + JSONL trace</td>
+</tr>
+<tr>
+  <td><strong>Prompts</strong></td>
+  <td><code>src/prompts/*.md</code></td>
+  <td>所有 system prompt 独立成 Markdown，代码里用 <code>llm.prompt("name")</code> 加载</td>
+</tr>
+<tr>
+  <td><strong>配置</strong></td>
+  <td><code>src/config.py</code> + <code>.env</code></td>
+  <td>pydantic-settings 单例；所有路径、模型名、消融开关都走环境变量</td>
+</tr>
+<tr>
+  <td><strong>评估</strong></td>
+  <td><code>evaluation/</code></td>
+  <td>metrics (准确率/F1/Cohen κ) + ablation 脚手架</td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="state">四、State Schema 与数据流</h2>
+
+<p>State 是一个 <code>TypedDict</code>，<strong>累加式</strong>——每个节点只往里加自己的字段，不删上游产物。这让任意节点失败都能回溯，也让消融实验前后对照变得平凡。</p>
+
+<pre><code>GraphState
+├── 元信息           : patient_id, session_id, timestamp, video_path
+├── intake           : 主诉 / 量表 / 人口学 + LLM 抽取的 structured 字段
+├── vision_metrics   : blink_rate, gaze_amplitude, fixation_stability, ...
+├── aggregated       : normalized / anomalies / summary_stats / composite_score
+├── retrieval        : { "guideline": [...], "case": [...] }
+├── diagnosis_candidates : [ {temperature, label, severity, CoT, evidence}, ×3 ]
+├── final_diagnosis  : label / severity / confidence / vote_distribution
+├── requires_human_review : bool
+├── case_library_record_id : str | None
+├── reports          : { doctor_md, patient_md }
+├── ablation_flags   : 本次运行启用的消融开关
+├── llm_calls        : [ {agent, model, prompt, output, tokens, latency, ...}, ... ]
+└── errors           : { agent_name: error_str }   # 单点错误不中断后续节点
+</code></pre>
+
+<h2 id="design">五、关键设计取舍</h2>
+
+<ol>
+  <li>
+    <strong>顺序图 + agent 内部短路</strong>，不是条件分支图。<br>
+    <em>理由：</em>消融实验改 <code>.env</code> 即可，无需重编图；图拓扑稳定有利于审稿复现。
+  </li>
+  <li>
+    <strong>Self-consistency 用 temperature 多样化，而非多模型</strong>（0.3/0.5/0.7 各跑一次）。<br>
+    <em>理由：</em>本地 Ollama 只有一份模型权重；temperature 采样在工程上最低成本拿到分布。
+  </li>
+  <li>
+    <strong>视觉模型不内联，做成独立 FastAPI 服务</strong>。<br>
+    <em>理由：</em>Detectron2 依赖重 / 模型已训好；解耦后 agent 工程不被视觉依赖污染，也方便 GPU 资源单独排布。
+  </li>
+  <li>
+    <strong>病例库双 backend（JSONL ⇄ PG + pgvector）</strong>。<br>
+    <em>理由：</em>第一版无需运维门槛；规模化后无缝升级，schema 已在 <code>scripts/init_db.sql</code> 落定。
+  </li>
+  <li>
+    <strong>LLM 强制 JSON 模式 + 宽松解析兜底</strong>（<code>llm.parse_json_loose</code>）。<br>
+    <em>理由：</em>Ollama 偶尔返回带噪 JSON；截取首尾大括号兜底，避免单次抖动整链失败。
+  </li>
+  <li>
+    <strong>第一版不做 UI / Docker / 异步</strong>。<br>
+    <em>理由：</em>CLI 跑通端到端足够支撑论文实验；过早工程化会拖慢方法学迭代。
+  </li>
+</ol>
+
+<h2 id="layout">六、代码组织</h2>
+
+<pre><code>Eye-agent/
+├── pyproject.toml            # langgraph / langchain-ollama / llama-index / fastapi / pgvector / ...
+├── requirements.txt          # 与 pyproject 同步的 pip 清单（conda 环境用）
+├── .env.example  /  .env     # pydantic-settings 全部参数入口
+├── README.md
+├── REQUIREMENTS.html         # 项目初始需求快照
+├── progress.html             # 项目进度
+├── OVERVIEW.html             # 本文件
+│
+├── src/
+│   ├── config.py             # Settings 单例 + AblationFlags
+│   ├── state.py              # GraphState TypedDict + new_state()
+│   ├── graph.py              # 8 节点编排 + 模块级 compiled_graph
+│   ├── llm.py                # chat / warmup / prompt / parse_json_loose
+│   ├── main.py               # typer CLI 入口
+│   ├── agents/               # 8 个 agent：intake / vision / feature_aggregator /
+│   │                         #   retrieval / diagnosis / consistency /
+│   │                         #   case_library / report
+│   ├── tools/                # vision_service_client / case_db / rag_retriever
+│   ├── services/             # vision_api.py (FastAPI + Detectron2 TODO)
+│   └── prompts/              # 4 份 system prompt (intake / diagnosis / 双报告)
+│
+├── scripts/
+│   ├── demo_end_to_end.py    # mock 数据跑全链路
+│   ├── run_single_case.py
+│   ├── ingest_knowledge.py   # 灌入指南文档到 RAG 索引
+│   ├── init_db.sql           # PG + pgvector schema
+│   └── knowledge_docs/       # 3 份占位指南（dry eye / CVS / accommodative）
+│
+├── evaluation/
+│   ├── metrics.py            # accuracy / F1 / Cohen κ
+│   └── ablation.py
+│
+├── tests/
+│   ├── test_state.py
+│   ├── test_each_agent.py    # 每个 agent 可独立测试
+│   └── fixtures/mock_state.py
+│
+└── logs/                     # 运行时产物
+    ├── llm_traces/           # 每个 session 一份 JSONL
+    ├── rag_index/            # LlamaIndex 持久化
+    └── reports/              # state.json + doctor.md + patient.md
+</code></pre>
+
+<h2 id="quickstart">七、快速跑通</h2>
+
+<pre><code># 1) 准备环境（首次）
+conda create -n eye-agent python=3.11 -y && conda activate eye-agent
+pip install -r requirements.txt
+cp .env.example .env
+
+# 2) 确认 Ollama 在跑、模型已 pull
+ollama list      # 期望看到 OLLAMA_MODEL 指定的那个
+
+# 3) 启动视觉服务（先用 mock 实现，Detectron2 代码待贴入 TODO）
+uvicorn src.services.vision_api:app --host 0.0.0.0 --port 8765
+
+# 4) 跑端到端 demo
+python -m scripts.demo_end_to_end --video /tmp/mock_video.mp4 --patient-id demo_001
+
+# 5) 看产物
+ls logs/reports/   # *.state.json / *.doctor.md / *.patient.md
+ls logs/llm_traces/   # 每次 LLM 调用的全量 trace
+</code></pre>
+
+<div class="callout">
+  <strong>本地 vs Brain 一致性</strong><br>
+  本机 <code>/Users/leogy/LGYai/Research/Eye-agent</code> 是从
+  <code>brain:/home/brain/projects/eye-agent</code> 用 rsync 同步过来的全量副本，
+  排除了 <code>__pycache__</code> / <code>*.pyc</code>。重新同步：
+  <code>rsync -az --delete --exclude '__pycache__' brain@192.168.100.161:/home/brain/projects/eye-agent/ /Users/leogy/LGYai/Research/Eye-agent/</code>
+</div>
+
+<hr>
+<p style="color: var(--muted); font-size: 13px; text-align: center;">
+  整理基于本地代码 + 远端 <code>brain:eye-agent</code> 实际实现，
+  以 <code>REQUIREMENTS.html</code> 为需求源、<code>src/</code> 为事实源。
+</p>
+
+</body>
+</html>
